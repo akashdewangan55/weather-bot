@@ -1,69 +1,54 @@
 import os
-import requests
-import asyncio
+import logging
 from flask import Flask, request
-from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, ContextTypes
-from config import TELEGRAM_TOKEN, OPENWEATHER_API_KEY
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+)
+
+# Set your bot token
+BOT_TOKEN = os.environ.get("BOT_TOKEN") or "7710160278:AAEuNEnQOfIz2zNMWGWLLNCiNwiBn_4h-gw"
+WEBHOOK_URL = "https://weather-bot-mk58.onrender.com/webhook"
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Flask app
 app = Flask(__name__)
+application = Application.builder().token(BOT_TOKEN).build()
 
-# Telegram Bot & Application
-bot = Bot(token=TELEGRAM_TOKEN)
-application = Application.builder().token(TELEGRAM_TOKEN).build()
-
-# /start command
+# Basic command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Welcome! Use /weather <city> to get current weather.")
+    await update.message.reply_text("Hello! Your bot is working.")
 
-# /weather command
-async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("⚠️ Please provide a city name.")
-        return
-
-    city = ' '.join(context.args)
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-    res = requests.get(url).json()
-
-    if res.get("cod") != 200:
-        await update.message.reply_text("❌ City not found.")
-        return
-
-    name = res["name"]
-    temp = res["main"]["temp"]
-    desc = res["weather"][0]["description"]
-    await update.message.reply_text(f"🌆 {name}\n🌡️ {temp}°C\n☁️ {desc.capitalize()}")
-
-# Add command handlers
 application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("weather", weather))
 
-# Root route
-@app.route('/')
-def home():
-    return '🌐 Weather Bot is running!'
-
-# Webhook route
+# Telegram webhook endpoint
 @app.route('/webhook', methods=['POST'])
-def webhook():
-    update_data = request.get_json(force=True)
-    update = Update.de_json(update_data, bot)
+async def webhook():
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        await application.process_update(update)
+    return "OK"
 
-    # Process update using asyncio
-    asyncio.create_task(application.process_update(update))
-    return 'OK'
+# Root endpoint
+@app.route("/", methods=['GET'])
+def index():
+    return "Bot is running."
 
-# Start app and set webhook
-if __name__ == '__main__':
+# Set webhook when starting app
+async def set_webhook():
+    await application.bot.set_webhook(WEBHOOK_URL)
+    logger.info(f"Webhook set to {WEBHOOK_URL}")
+
+if __name__ == "__main__":
     import asyncio
 
-    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook"
-    asyncio.run(bot.set_webhook(webhook_url))
+    async def main():
+        await set_webhook()
+        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
-    # ✅ Properly await the initialization
-    asyncio.run(application.initialize())
-
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    asyncio.run(main())
