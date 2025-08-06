@@ -52,8 +52,11 @@ def webhook():
 # Run Flask app
 if __name__ == '__main__':
     import asyncio
+
     webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook"
-    asyncio.run(bot.set_webhook(webhook_url))  # ✅ Fix async warning
+    asyncio.run(bot.set_webhook(webhook_url))
+
+    application.initialize()  # ✅ Required for webhook apps
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
