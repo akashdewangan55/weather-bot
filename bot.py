@@ -7,11 +7,7 @@ from config import TELEGRAM_TOKEN, OPENWEATHER_API_KEY
 
 # Flask app
 app = Flask(__name__)
-
-# Telegram bot
 bot = Bot(token=TELEGRAM_TOKEN)
-
-# Telegram Application (without run_polling)
 application = Application.builder().token(TELEGRAM_TOKEN).build()
 
 # /start command
@@ -53,12 +49,11 @@ def webhook():
     application.update_queue.put_nowait(update)
     return 'OK'
 
-# Set webhook when app starts
-@app.before_first_request
-def set_webhook():
+# Run Flask app
+if __name__ == '__main__':
+    # Set webhook before running app
     webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook"
     bot.set_webhook(webhook_url)
 
-# Start Flask server
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
